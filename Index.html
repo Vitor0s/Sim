@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>FREE BATTLE 3D — Protótipo</title>
+<style>
+  *{box-sizing:border-box} html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101923;font-family:Arial,sans-serif;color:white}
+  #game{position:fixed;inset:0}
+  #hud{position:fixed;inset:0;pointer-events:none}
+  #topbar{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .pill{background:#07131dcc;border:1px solid #ffffff35;border-radius:12px;padding:9px 12px;font-size:13px;backdrop-filter:blur(8px)}
+  #help{position:absolute;left:12px;bottom:12px;max-width:310px;line-height:1.45}
+  #crosshair{position:absolute;left:50%;top:50%;width:8px;height:8px;border:1px solid #ffffffaa;border-radius:50%;transform:translate(-50%,-50%);opacity:.6}
+  #lobby{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(120deg,#07131ddd,#07131d88),url('') center/cover;z-index:5;padding:20px}
+  .panel{width:min(440px,100%);padding:26px;border:1px solid #ffffff35;border-radius:22px;background:#101e2bea;box-shadow:0 20px 70px #0009;text-align:center}
+  h1{font-size:clamp(30px,8vw,48px);margin:0 0 8px;letter-spacing:1px}
+  .accent{color:#8ee36d}.sub{color:#c7d3df;line-height:1.5;font-size:14px}
+  button{border:0;border-radius:12px;background:#8ee36d;color:#10200c;font-weight:800;padding:14px 20px;font-size:16px;cursor:pointer}
+  #start{width:100%;margin-top:18px}
+  #mobile{position:fixed;inset:auto 0 18px 0;display:none;justify-content:space-between;padding:0 18px;pointer-events:none;z-index:4}
+  .pad{display:grid;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(2,54px);gap:5px;pointer-events:auto}
+  .pad button{padding:0;background:#102333bb;color:white;border:1px solid #ffffff66;border-radius:14px;touch-action:none}
+  .pad .up{grid-column:2}.pad .left{grid-column:1;grid-row:2}.pad .down{grid-column:2;grid-row:2}.pad .right{grid-column:3;grid-row:2}
+  #look{align-self:end;display:flex;gap:8px;pointer-events:auto}
+  #look button{width:58px;height:58px;padding:0;background:#102333bb;color:white;border:1px solid #ffffff66;touch-action:none}
+  @media(max-width:800px),(pointer:coarse){#mobile{display:flex}#help{display:none}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+  <div id="topbar">
+    <div class="pill"><b>FREE BATTLE <span class="accent">3D</span></b></div>
+    <div class="pill" id="status">Exploração • Protótipo</div>
+  </div>
+  <div id="crosshair"></div>
+  <div class="pill" id="help">WASD ou setas: movimentar<br>Mouse: olhar ao redor • Arraste na tela: girar câmera<br>Este é o primeiro protótipo de movimentação.</div>
+</div>
+<div id="mobile">
+  <div class="pad">
+    <button class="up" data-key="w">▲</button>
+    <button class="left" data-key="a">◀</button>
+    <button class="down" data-key="s">▼</button>
+    <button class="right" data-key="d">▶</button>
+  </div>
+  <div id="look">
+    <button id="turnL">↶</button><button id="turnR">↷</button>
+  </div>
+</div>
+<div id="lobby">
+  <div class="panel">
+    <h1>FREE BATTLE <span class="accent">3D</span></h1>
+    <p class="sub">Explore o primeiro mapa 3D. Esta versão inicial traz cenário, personagem e movimentação para computador e celular.</p>
+    <button id="start">ENTRAR NO MAPA</button>
+    <p class="sub" style="font-size:11px;margin:16px 0 0">Protótipo inicial • Multiplayer online será conectado em uma próxima etapa.</p>
+  </div>
+</div>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const mount=document.getElementById('game');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x9bc9e8);
+scene.fog=new THREE.Fog(0x9bc9e8,65,190);
+
+const camera=new THREE.PerspectiveCamera(68,innerWidth/innerHeight,.1,400);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+mount.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xd8efff,0x526447,2.0));
+const sun=new THREE.DirectionalLight(0xfff1d2,2.5);
+sun.position.set(-35,65,25);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-90;sun.shadow.camera.right=90;sun.shadow.camera.top=90;sun.shadow.camera.bottom=-90;
+scene.add(sun);
+
+const mat=(color,roughness=.9)=>new THREE.MeshStandardMaterial({color,roughness});
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(240,240),mat(0x638b4d));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+
+// Faixas de estrada e caminhos
+const road=new THREE.Mesh(new THREE.PlaneGeometry(18,180),mat(0x454b4b));
+road.rotation.x=-Math.PI/2;road.position.set(0,.025,0);scene.add(road);
+for(let z=-82;z<90;z+=12){
+ const stripe=new THREE.Mesh(new THREE.PlaneGeometry(.35,5),mat(0xe8dfb6));
+ stripe.rotation.x=-Math.PI/2;stripe.position.set(0,.04,z);scene.add(stripe);
+}
+
+// Água ao redor da ilha
+const water=new THREE.Mesh(new THREE.PlaneGeometry(600,600),new THREE.MeshStandardMaterial({color:0x287f9b,roughness:.35}));
+water.rotation.x=-Math.PI/2;water.position.y=-1.1;scene.add(water);
+
+// Montanhas ao fundo
+for(let i=0;i<18;i++){
+ const a=i/18*Math.PI*2, r=112+Math.random()*15;
+ const m=new THREE.Mesh(new THREE.ConeGeometry(12+Math.random()*10,28+Math.random()*22,5),mat(i%2?0x657b69:0x778b78));
+ m.position.set(Math.cos(a)*r,12,Math.sin(a)*r);m.castShadow=true;scene.add(m);
+}
+
+// Árvores
+function tree(x,z,s=1){
+ const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.35*s,.55*s,4*s,7),mat(0x65462e));
+ trunk.position.set(x,2*s,z);trunk.castShadow=true;scene.add(trunk);
+ const crown=new THREE.Mesh(new THREE.ConeGeometry(2.3*s,6*s,7),mat(0x285b37));
+ crown.position.set(x,6*s,z);crown.castShadow=true;scene.add(crown);
+ const crown2=new THREE.Mesh(new THREE.ConeGeometry(1.7*s,4.5*s,7),mat(0x367447));
+ crown2.position.set(x,8*s,z);crown2.castShadow=true;scene.add(crown2);
+}
+for(let i=0;i<95;i++){
+ const x=(Math.random()-.5)*190,z=(Math.random()-.5)*190;
+ if(Math.abs(x)<17 || (Math.abs(x)<30&&Math.abs(z)<25))continue;
+ tree(x,z,.7+Math.random()*.7);
+}
+
+// Casas e galpões
+function building(x,z,w,d,h,color=0xd4c5a2){
+ const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color));
+ body.position.set(x,h/2,z);body.castShadow=true;body.receiveShadow=true;scene.add(body);
+ const roof=new THREE.Mesh(new THREE.ConeGeometry(Math.max(w,d)*.78, h*.45,4),mat(0x784a3c));
+ roof.rotation.y=Math.PI/4;roof.position.set(x,h+h*.18,z);roof.scale.set(1,.65,d/Math.max(w,d));roof.castShadow=true;scene.add(roof);
+ const door=new THREE.Mesh(new THREE.BoxGeometry(1.2,2.2,.12),mat(0x49372b));
+ door.position.set(x,h/2-0.1,z+d/2+.07);scene.add(door);
+}
+building(-27,-18,13,12,7,0xd4c5a2);
+building(-44,3,11,13,6,0xc6d1c2);
+building(28,-22,15,12,8,0xd9c7a7);
+building(43,4,12,15,7,0xc8b69b);
+building(-25,28,14,10,6,0xc4c9bd);
+building(27,31,13,12,7,0xd5c8ad);
+
+// Rochas decorativas
+for(let i=0;i<35;i++){
+ const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(1+Math.random()*2,0),mat(0x777d70));
+ rock.position.set((Math.random()-.5)*160,.6,(Math.random()-.5)*160);
+ rock.scale.y=.6;rock.castShadow=true;scene.add(rock);
+}
+
+// Personagem estilizado
+const player=new THREE.Group();scene.add(player);
+const suit=mat(0x243b55,.75),skin=mat(0xc99570),dark=mat(0x17212b);
+const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.72,.85,5,10),suit);
+torso.position.y=1.55;torso.castShadow=true;player.add(torso);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.43,16,12),skin);
+head.position.y=2.65;head.castShadow=true;player.add(head);
+const pack=new THREE.Mesh(new THREE.BoxGeometry(.8,.9,.35),dark);
+pack.position.set(0,1.65,-.72);player.add(pack);
+for(const x of [-.42,.42]){
+ const leg=new THREE.Mesh(new THREE.CapsuleGeometry(.23,.72,4,8),dark);
+ leg.position.set(x,.55,0);player.add(leg);
+ const arm=new THREE.Mesh(new THREE.CapsuleGeometry(.2,.72,4,8),suit);
+ arm.position.set(x*1.8,1.65,0);arm.rotation.z=x>0?-.15:.15;player.add(arm);
+}
+player.position.set(0,0,12);
+
+// Posição e controles
+const keys={};
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;});
+addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+document.querySelectorAll('[data-key]').forEach(btn=>{
+ const k=btn.dataset.key;
+ const on=e=>{e.preventDefault();keys[k]=true};
+ const off=e=>{e.preventDefault();keys[k]=false};
+ btn.addEventListener('pointerdown',on);
+ ['pointerup','pointercancel','pointerleave'].forEach(ev=>btn.addEventListener(ev,off));
+});
+let yaw=0,dragging=false,lastX=0;
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;});
+addEventListener('pointerup',()=>dragging=false);
+addEventListener('pointermove',e=>{
+ if(dragging && e.pointerType!=='mouse'){yaw-=(e.clientX-lastX)*.008;lastX=e.clientX;}
+});
+let turning=0;
+document.getElementById('turnL').addEventListener('pointerdown',()=>turning=1);
+document.getElementById('turnR').addEventListener('pointerdown',()=>turning=-1);
+['turnL','turnR'].forEach(id=>['pointerup','pointerleave','pointercancel'].forEach(ev=>document.getElementById(id).addEventListener(ev,()=>turning=0)));
+
+renderer.domElement.addEventListener('click',()=>{
+ if(matchMedia('(pointer:fine)').matches && !document.pointerLockElement) renderer.domElement.requestPointerLock?.();
+});
+document.addEventListener('mousemove',e=>{
+ if(document.pointerLockElement===renderer.domElement)yaw-=e.movementX*.0025;
+});
+
+const clock=new THREE.Clock();
+const cameraOffset=new THREE.Vector3(0,5.2,9.5);
+const desired=new THREE.Vector3();
+function animate(){
+ requestAnimationFrame(animate);
+ const dt=Math.min(clock.getDelta(),.04);
+ let forward=(keys.w||keys.arrowup?1:0)-(keys.s||keys.arrowdown?1:0);
+ let side=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0);
+ yaw+=turning*dt*1.8;
+ const move=new THREE.Vector3(side,0,-forward);
+ if(move.lengthSq()>0){
+   move.normalize().applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
+   player.position.addScaledVector(move,dt*10);
+   player.rotation.y=Math.atan2(-move.x,-move.z);
+ }
+ player.position.x=THREE.MathUtils.clamp(player.position.x,-95,95);
+ player.position.z=THREE.MathUtils.clamp(player.position.z,-95,95);
+ const offset=cameraOffset.clone().applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
+ desired.copy(player.position).add(offset);
+ camera.position.lerp(desired,1-Math.pow(.001,dt));
+ camera.lookAt(player.position.x,player.position.y+1.65,player.position.z);
+ renderer.render(scene,camera);
+}
+animate();
+
+document.getElementById('start').addEventListener('click',()=>{
+ document.getElementById('lobby').style.display='none';
+ document.getElementById('status').textContent='Explorando o mapa';
+});
+addEventListener('resize',()=>{
+ camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
